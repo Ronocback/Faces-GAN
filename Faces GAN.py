@@ -9,8 +9,6 @@ from torch.autograd.variable import Variable
 from torchvision import transforms, datasets
 
 print(torch.__version__)
-# In[3]:
-
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -170,10 +168,6 @@ def fake_data_target(size):
     data = Variable(torch.zeros(size, 1))
     if torch.cuda.is_available(): return data.cpu()
     return data
-
-
-# In[11]:
-
 
 def train_discriminator(optimizer, real_data, fake_data):
     # Reset gradients
