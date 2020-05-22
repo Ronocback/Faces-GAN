@@ -7,3 +7,5 @@ data/*
 runs/*
 torch_data/*
 Vanilla Example.py
+*.json
+.vscode/settings.json

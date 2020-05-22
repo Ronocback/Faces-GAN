@@ -42,7 +42,7 @@ class DiscriminatorNet(torch.nn.Module):
     """
     def __init__(self):
         super(DiscriminatorNet, self).__init__()
-        n_features = 60000
+        n_features = 10000
         n_out = 1
         
         self.hidden0 = nn.Sequential( 
@@ -94,11 +94,11 @@ class GeneratorNet(torch.nn.Module):
         n_out = 10000
         
         self.hidden0 = nn.Sequential(
-            nn.Linear(n_features, 64),
+            nn.Linear(n_features, 256),
             nn.LeakyReLU(0.2)
         )
         self.hidden1 = nn.Sequential(            
-            nn.Linear(64, 128),
+            nn.Linear(256, 128),
             nn.LeakyReLU(0.2)
         )
         self.hidden2 = nn.Sequential(
@@ -125,6 +125,7 @@ class GeneratorNet(torch.nn.Module):
 # Noise
 def noise(size):
     n = Variable(torch.randn(size, 100))
+    n.cpu()
     if torch.cuda.is_available(): return n.cuda() 
     return n
 
@@ -159,22 +160,27 @@ def real_data_target(size):
     '''
     Tensor containing ones, with shape = size
     '''
-    data = Variable(torch.ones(size, 1))
-    if torch.cuda.is_available(): return data.cpu()
+    print("real target")
+    data = Variable(torch.ones(size, 1).cuda())
+    data.cpu()
+    if torch.cuda.is_available(): return data.cuda()
     return data
 
 def fake_data_target(size):
     '''
     Tensor containing zeros, with shape = size
     '''
-    data = Variable(torch.zeros(size, 1))
-    if torch.cuda.is_available(): return data.cpu()
+    print("fake target")
+    data = Variable(torch.zeros(size, 1).cuda())
+    data.cpu()
+    if torch.cuda.is_available(): return data.cuda()
     return data
 
 def train_discriminator(optimizer, real_data, fake_data):
     # Reset gradients
     optimizer.zero_grad()
-    
+    print(str(real_data.size()) + " real_data")
+    #real_data = real_data.reshape([6,10000])
     # 1.1 Train on Real Data
     prediction_real = discriminator(real_data)
     # Calculate error and backpropagate
@@ -216,16 +222,16 @@ test_noise = noise(num_test_samples)
 
 # ### Start training
 
-logger = Logger(model_name='VGAN', data_name='MNIST')
+logger = Logger(model_name='Face GAN', data_name='Custom')
 
 for epoch in range(num_epochs):
     for n_batch, (real_batch,_) in enumerate(data_loader):
 
         # 1. Train Discriminator
-        print(real_batch.size())
-        real_data = Variable(real_batch)
-        real_data=real_data.reshape(-1)
-        print(real_data.size())
+        print(str(real_batch.size()) + " batch")
+        real_data = Variable(images_to_vectors(real_batch))
+        #real_data=real_data.reshape(-1)
+        print(str(real_data.size()) +" data")
 
         if torch.cuda.is_available(): real_data = real_data.cuda()
         # Generate fake data
@@ -246,7 +252,7 @@ for epoch in range(num_epochs):
         if (n_batch) % 100 == 0:
             display.clear_output(True)
             # Display Images
-            test_images = vectors_to_images(generator(test_noise)).data.cuda()
+            test_images = vectors_to_images(generator(test_noise)).data.cpu()
             logger.log_images(test_images, num_test_samples, epoch, n_batch, num_batches)
             # Display status Logs
             logger.display_status(
