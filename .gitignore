@@ -1,0 +1,8 @@
+
+*.jpg
+*.png
+*.gz
+*.DESKTOP-E7RM8FC
+data/*
+runs/*
+torch_data/*
