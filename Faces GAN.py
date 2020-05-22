@@ -20,6 +20,7 @@ DATA_FOLDER = './utkcropped'
 def mnist_data():
     compose = transforms.Compose(
         [transforms.Grayscale(),
+         transforms.Resize((100,100)),
          transforms.ToTensor(),
          transforms.Normalize((.5,), (.5,))
         ])
@@ -29,7 +30,7 @@ def mnist_data():
 # Load data
 data = mnist_data()
 # Create loader with data, so that we can iterate over it
-data_loader = torch.utils.data.DataLoader(data, batch_size=15, shuffle=True)
+data_loader = torch.utils.data.DataLoader(data, batch_size=6, shuffle=True)
 # Num batches
 num_batches = len(data_loader)
 
@@ -41,7 +42,7 @@ class DiscriminatorNet(torch.nn.Module):
     """
     def __init__(self):
         super(DiscriminatorNet, self).__init__()
-        n_features = 40000
+        n_features = 60000
         n_out = 1
         
         self.hidden0 = nn.Sequential( 
@@ -76,11 +77,11 @@ class DiscriminatorNet(torch.nn.Module):
     
 def images_to_vectors(images):
     print("Images to vec")
-    return images.view(images.size(0), 40000)
+    return images.view(images.size(0), 10000)
 
 def vectors_to_images(vectors):
     print("vec to image")
-    return vectors.view(vectors.size(0), 1, 200, 200)
+    return vectors.view(vectors.size(0), 1, 100, 100)
 
 
 class GeneratorNet(torch.nn.Module):
@@ -90,7 +91,7 @@ class GeneratorNet(torch.nn.Module):
     def __init__(self):
         super(GeneratorNet, self).__init__()
         n_features = 100
-        n_out = 40000
+        n_out = 10000
         
         self.hidden0 = nn.Sequential(
             nn.Linear(n_features, 64),
@@ -118,6 +119,7 @@ class GeneratorNet(torch.nn.Module):
         x = self.hidden2(x)
         print(str(x.size()) + "g2")
         x = self.out(x)
+        print("gen ret")
         return x
     
 # Noise
