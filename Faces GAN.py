@@ -1,16 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-#get_ipython().run_line_magic('load_ext', 'autoreload')
-#get_ipython().run_line_magic('matplotlib', 'inline')
-
-
-# In[2]:
-
-
-#get_ipython().run_line_magic('autoreload', '2')
 
 from IPython import display
 
@@ -31,10 +18,6 @@ torch.cuda.empty_cache()
 DATA_FOLDER = './utkcropped'
 
 
-# ## Load Data
-
-# In[4]:
-
 
 def mnist_data():
     compose = transforms.Compose(
@@ -45,9 +28,6 @@ def mnist_data():
     return datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
 
 
-# In[5]:
-
-
 # Load data
 data = mnist_data()
 # Create loader with data, so that we can iterate over it
@@ -55,11 +35,7 @@ data_loader = torch.utils.data.DataLoader(data, batch_size=15, shuffle=True)
 # Num batches
 num_batches = len(data_loader)
 
-
-# ## Networks
-
-# In[6]:
-
+# Networks
 
 class DiscriminatorNet(torch.nn.Module):
     """
@@ -109,9 +85,6 @@ def vectors_to_images(vectors):
     return vectors.view(vectors.size(0), 1, 200, 200)
 
 
-# In[7]:
-
-
 class GeneratorNet(torch.nn.Module):
     """
     A three hidden-layer generative neural network
@@ -156,8 +129,6 @@ def noise(size):
     return n
 
 
-# In[8]:
-
 
 discriminator = DiscriminatorNet()
 generator = GeneratorNet()
@@ -167,9 +138,6 @@ if torch.cuda.is_available():
 
 
 # ## Optimization
-
-# In[9]:
-
 
 # Optimizers
 d_optimizer = optim.Adam(discriminator.parameters(), lr=0.0002)
@@ -185,8 +153,6 @@ num_epochs = 200
 
 
 # ## Training
-
-# In[10]:
 
 
 def real_data_target(size):
@@ -248,17 +214,11 @@ def train_generator(optimizer, fake_data):
 
 # ### Generate Samples for Testing
 
-# In[12]:
-
-
 num_test_samples = 16
 test_noise = noise(num_test_samples)
 
 
 # ### Start training
-
-# In[13]:
-
 
 logger = Logger(model_name='VGAN', data_name='MNIST')
 
@@ -299,10 +259,4 @@ for epoch in range(num_epochs):
             )
         # Model Checkpoints
         logger.save_models(generator, discriminator, epoch)
-
-
-# In[ ]:
-
-
-
 
