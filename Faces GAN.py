@@ -51,7 +51,7 @@ def mnist_data():
 # Load data
 data = mnist_data()
 # Create loader with data, so that we can iterate over it
-data_loader = torch.utils.data.DataLoader(data, batch_size=100, shuffle=True)
+data_loader = torch.utils.data.DataLoader(data, batch_size=15, shuffle=True)
 # Num batches
 num_batches = len(data_loader)
 
@@ -122,20 +122,20 @@ class GeneratorNet(torch.nn.Module):
         n_out = 40000
         
         self.hidden0 = nn.Sequential(
-            nn.Linear(n_features, 256),
+            nn.Linear(n_features, 64),
             nn.LeakyReLU(0.2)
         )
         self.hidden1 = nn.Sequential(            
-            nn.Linear(256, 512),
+            nn.Linear(64, 128),
             nn.LeakyReLU(0.2)
         )
         self.hidden2 = nn.Sequential(
-            nn.Linear(512, 1024),
+            nn.Linear(128, 256),
             nn.LeakyReLU(0.2)
         )
         
         self.out = nn.Sequential(
-            nn.Linear(1024, n_out),
+            nn.Linear(256, n_out),
             nn.Tanh()
         )
 
