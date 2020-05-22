@@ -16,7 +16,7 @@ from IPython import display
 
 from utils import Logger
 
-import torch
+import torch, gc
 from torch import nn, optim
 from torch.autograd.variable import Variable
 from torchvision import transforms, datasets
@@ -24,6 +24,9 @@ from torchvision import transforms, datasets
 print(torch.__version__)
 # In[3]:
 
+
+gc.collect()
+torch.cuda.empty_cache()
 
 DATA_FOLDER = './utkcropped'
 
@@ -191,7 +194,7 @@ def real_data_target(size):
     Tensor containing ones, with shape = size
     '''
     data = Variable(torch.ones(size, 1))
-    if torch.cuda.is_available(): return data.cuda()
+    if torch.cuda.is_available(): return data.cpu()
     return data
 
 def fake_data_target(size):
@@ -199,7 +202,7 @@ def fake_data_target(size):
     Tensor containing zeros, with shape = size
     '''
     data = Variable(torch.zeros(size, 1))
-    if torch.cuda.is_available(): return data.cuda()
+    if torch.cuda.is_available(): return data.cpu()
     return data
 
 
@@ -265,6 +268,9 @@ for epoch in range(num_epochs):
         # 1. Train Discriminator
         print(real_batch.size())
         real_data = Variable(real_batch)
+        real_data=real_data.reshape(-1)
+        print(real_data.size())
+
         if torch.cuda.is_available(): real_data = real_data.cuda()
         # Generate fake data
         fake_data = generator(noise(real_data.size(0))).detach()
@@ -284,8 +290,8 @@ for epoch in range(num_epochs):
         if (n_batch) % 100 == 0:
             display.clear_output(True)
             # Display Images
-            test_images = vectors_to_images(generator(test_noise)).data.cpu()
-            logger.log_images(test_images, num_test_samples, epoch, n_batch, num_batches);
+            test_images = vectors_to_images(generator(test_noise)).data.cuda()
+            logger.log_images(test_images, num_test_samples, epoch, n_batch, num_batches)
             # Display status Logs
             logger.display_status(
                 epoch, num_epochs, n_batch, num_batches,
