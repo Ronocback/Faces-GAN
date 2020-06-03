@@ -7,6 +7,7 @@ import torch, gc
 from torch import nn, optim
 from torch.autograd.variable import Variable
 from torchvision import transforms, datasets
+from PIL import Image
 
 print(torch.__version__)
 
@@ -15,20 +16,15 @@ torch.cuda.empty_cache()
 
 DATA_FOLDER = './utkcropped'
 
-
-
-def mnist_data():
-    compose = transforms.Compose(
+compose = transforms.Compose(
         [transforms.Grayscale(),
          transforms.Resize((100,100)),
          transforms.ToTensor(),
          transforms.Normalize((.5,), (.5,))
         ])
-    return datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
-
 
 # Load data
-data = mnist_data()
+data = datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
 # Create loader with data, so that we can iterate over it
 data_loader = torch.utils.data.DataLoader(data, batch_size=6, shuffle=True)
 # Num batches
@@ -121,14 +117,26 @@ class GeneratorNet(torch.nn.Module):
         x = self.out(x)
         print("gen ret")
         return x
-    
+
+
 # Noise
-def noise(size):
+def noise_tensor(size):
     n = Variable(torch.randn(size, 100))
     n.cpu()
-    if torch.cuda.is_available(): return n.cuda() 
+    if torch.cuda.is_available():
+        return n.cuda()
     return n
 
+
+# Img path to tensor
+def image_tensor(path):
+    img = Image.open(path)
+    trans = transforms.ToTensor()
+    n = Variable(compose(trans(img)))
+    n.cpu()
+    if torch.cuda.is_available():
+        return n.cuda()
+    return n
 
 
 discriminator = DiscriminatorNet()
@@ -166,6 +174,7 @@ def real_data_target(size):
     if torch.cuda.is_available(): return data.cuda()
     return data
 
+
 def fake_data_target(size):
     '''
     Tensor containing zeros, with shape = size
@@ -175,6 +184,7 @@ def fake_data_target(size):
     data.cpu()
     if torch.cuda.is_available(): return data.cuda()
     return data
+
 
 def train_discriminator(optimizer, real_data, fake_data):
     # Reset gradients
@@ -199,6 +209,7 @@ def train_discriminator(optimizer, real_data, fake_data):
     # Return error
     return error_real + error_fake, prediction_real, prediction_fake
 
+
 def train_generator(optimizer, fake_data):
     # 2. Train Generator
     # Reset gradients
@@ -217,7 +228,7 @@ def train_generator(optimizer, fake_data):
 # ### Generate Samples for Testing
 
 num_test_samples = 16
-test_noise = noise(num_test_samples)
+test_noise = noise_tensor(num_test_samples)
 
 
 # ### Start training
@@ -235,14 +246,14 @@ for epoch in range(num_epochs):
 
         if torch.cuda.is_available(): real_data = real_data.cuda()
         # Generate fake data
-        fake_data = generator(noise(real_data.size(0))).detach()
+        fake_data = generator(noise_tensor(real_data.size(0))).detach()
         # Train D
         d_error, d_pred_real, d_pred_fake = train_discriminator(d_optimizer,
                                                                 real_data, fake_data)
 
         # 2. Train Generator
         # Generate fake data
-        fake_data = generator(noise(real_batch.size(0)))
+        fake_data = generator(noise_tensor(real_batch.size(0)))
         # Train G
         g_error = train_generator(g_optimizer, fake_data)
         # Log error

@@ -8,3 +8,10 @@ torch_data/*
 Vanilla Example.py
 *.json
 .vscode/settings.json
+.idea/vcs.xml
+.idea/Faces-GAN.iml
+.idea/encodings.xml
+.idea/workspace.xml
+.idea/modules.xml
+.idea/misc.xml
+.idea/libraries/R_User_Library.xml
