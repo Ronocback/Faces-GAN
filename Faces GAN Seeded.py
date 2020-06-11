@@ -15,10 +15,11 @@ gc.collect()
 torch.cuda.empty_cache()
 
 DATA_FOLDER = './utkcropped'
+SELF_IMAGE = "E:\\ML Playground\\Faces-GAN\\self\\me.jpg"
 
 compose = transforms.Compose(
         [transforms.Grayscale(),
-         transforms.Resize((150,150)),
+         transforms.Resize((100,100)),
          transforms.ToTensor(),
          transforms.Normalize((.5,), (.5,))
         ])
@@ -26,7 +27,7 @@ compose = transforms.Compose(
 # Load data
 data = datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
 # Create loader with data, so that we can iterate over it
-data_loader = torch.utils.data.DataLoader(data, batch_size=16, shuffle=True, pin_memory=True)
+data_loader = torch.utils.data.DataLoader(data, batch_size=6, shuffle=True)
 # Num batches
 num_batches = len(data_loader)
 
@@ -38,7 +39,7 @@ class DiscriminatorNet(torch.nn.Module):
     """
     def __init__(self):
         super(DiscriminatorNet, self).__init__()
-        n_features = 22500
+        n_features = 10000
         n_out = 1
         
         self.hidden0 = nn.Sequential( 
@@ -73,11 +74,11 @@ class DiscriminatorNet(torch.nn.Module):
     
 def images_to_vectors(images):
     print("Images to vec")
-    return images.view(images.size(0), 22500)
+    return images.view(images.size(0), 10000)
 
 def vectors_to_images(vectors):
     print("vec to image")
-    return vectors.view(vectors.size(0), 1, 150, 150)
+    return vectors.view(vectors.size(0), 1, 100, 100)
 
 
 class GeneratorNet(torch.nn.Module):
@@ -86,8 +87,8 @@ class GeneratorNet(torch.nn.Module):
     """
     def __init__(self):
         super(GeneratorNet, self).__init__()
-        n_features = 150
-        n_out = 22500
+        n_features = 100
+        n_out = 10000
         
         self.hidden0 = nn.Sequential(
             nn.Linear(n_features, 256),
@@ -99,8 +100,7 @@ class GeneratorNet(torch.nn.Module):
         )
         self.hidden2 = nn.Sequential(
             nn.Linear(128, 256),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(0.1)
+            nn.LeakyReLU(0.2)
         )
         
         self.out = nn.Sequential(
@@ -122,20 +122,21 @@ class GeneratorNet(torch.nn.Module):
 
 # Noise
 def noise_tensor(size):
-    n = Variable(torch.randn(size, 150))
+    n = Variable(torch.randn(size, 100))
     n.cpu()
-    print(str(n.size()) + " noise size")
     if torch.cuda.is_available():
         return n.cuda()
+    print(n.size() + "")
     return n
 
 
 # Img path to tensor
-def image_tensor(path):
+def image_tensor(path, size):
     img = Image.open(path)
-    trans = transforms.ToTensor()
-    n = Variable(compose(trans(img)))
+    n = Variable(compose(img))
+    n.resize_(size, 100)
     n.cpu()
+    print(str(n.size()) + " image seed size")
     if torch.cuda.is_available():
         return n.cuda()
     return n
@@ -230,12 +231,12 @@ def train_generator(optimizer, fake_data):
 # ### Generate Samples for Testing
 
 num_test_samples = 16
-test_noise = noise_tensor(num_test_samples)
+test_noise = image_tensor(SELF_IMAGE, num_test_samples)
 
 
 # ### Start training
 
-logger = Logger(model_name='Face GAN', data_name='Custom_2')
+logger = Logger(model_name='Face GAN', data_name='Self')
 
 for epoch in range(num_epochs):
     for n_batch, (real_batch,_) in enumerate(data_loader):
@@ -248,14 +249,14 @@ for epoch in range(num_epochs):
 
         if torch.cuda.is_available(): real_data = real_data.cuda()
         # Generate fake data
-        fake_data = generator(noise_tensor(real_data.size(0))).detach()
+        fake_data = generator(image_tensor(SELF_IMAGE, real_data.size(0))).detach()
         # Train D
         d_error, d_pred_real, d_pred_fake = train_discriminator(d_optimizer,
                                                                 real_data, fake_data)
 
         # 2. Train Generator
         # Generate fake data
-        fake_data = generator(noise_tensor(real_batch.size(0)))
+        fake_data = generator(image_tensor(SELF_IMAGE, real_data.size(0)))
         # Train G
         g_error = train_generator(g_optimizer, fake_data)
         # Log error
