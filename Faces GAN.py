@@ -94,17 +94,17 @@ class GeneratorNet(torch.nn.Module):
             nn.LeakyReLU(0.2)
         )
         self.hidden1 = nn.Sequential(            
-            nn.Linear(256, 128),
+            nn.Linear(256, 512),
             nn.LeakyReLU(0.2)
         )
         self.hidden2 = nn.Sequential(
-            nn.Linear(128, 256),
+            nn.Linear(512, 1024),
             nn.LeakyReLU(0.2),
             nn.Dropout(0.1)
         )
         
         self.out = nn.Sequential(
-            nn.Linear(256, n_out),
+            nn.Linear(1024, n_out),
             nn.Tanh()
         )
 
@@ -235,7 +235,7 @@ test_noise = noise_tensor(num_test_samples)
 
 # ### Start training
 
-logger = Logger(model_name='Face GAN', data_name='Custom_2')
+logger = Logger(model_name='Face GAN', data_name='Custom_3')
 
 for epoch in range(num_epochs):
     for n_batch, (real_batch,_) in enumerate(data_loader):
