@@ -1,20 +1,27 @@
-
-from IPython import display
-
-from utils import Logger
-
-import torch, gc
-from torch import nn, optim
-from torch.autograd.variable import Variable
+import torch
+from numpy import expand_dims
+from numpy import zeros
+from numpy import ones
+from numpy.random import randn
+from numpy.random import randint
+from keras.datasets.fashion_mnist import load_data
+from keras.optimizers import Adam
+from keras.models import Model
+from keras.layers import Input
+from keras.layers import Dense
+from keras.layers import Reshape
+from keras.layers import Flatten
+from keras.layers import Conv2D
+from keras.layers import Conv2DTranspose
+from keras.layers import LeakyReLU
+from keras.layers import Dropout
+from keras.layers import Embedding
+from keras.layers import Concatenate
 from torchvision import transforms, datasets
-from PIL import Image
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())
 
-print(torch.__version__)
-
-gc.collect()
-torch.cuda.empty_cache()
-
-DATA_FOLDER = './utkcropped'
+DATA_FOLDER = '/home/focal-ai/Documents/cgans-pd/data/labelled'
 
 compose = transforms.Compose(
         [transforms.Grayscale(),
@@ -27,251 +34,174 @@ compose = transforms.Compose(
 data = datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
 # Create loader with data, so that we can iterate over it
 data_loader = torch.utils.data.DataLoader(data, batch_size=16, shuffle=True, pin_memory=True)
+
 # Num batches
 num_batches = len(data_loader)
 
-# Networks
-
-class DiscriminatorNet(torch.nn.Module):
-    """
-    A three hidden-layer discriminative neural network
-    """
-    def __init__(self):
-        super(DiscriminatorNet, self).__init__()
-        n_features = 22500
-        n_out = 1
-        
-        self.hidden0 = nn.Sequential( 
-            nn.Linear(n_features, 1024),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(0.3)
-        )
-        self.hidden1 = nn.Sequential(
-            nn.Linear(1024, 512),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(0.3)
-        )
-        self.hidden2 = nn.Sequential(
-            nn.Linear(512, 256),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(0.3)
-        )
-        self.out = nn.Sequential(
-            torch.nn.Linear(256, n_out),
-            torch.nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        x = self.hidden0(x)
-        print(str(x.size()) + "d0")
-        x = self.hidden1(x)
-        print(str(x.size()) + "d1")
-        x = self.hidden2(x)
-        print(str(x.size()) + "d2")
-        x = self.out(x)
-        return x
-    
-def images_to_vectors(images):
-    print("Images to vec")
-    return images.view(images.size(0), 22500)
-
-def vectors_to_images(vectors):
-    print("vec to image")
-    return vectors.view(vectors.size(0), 1, 150, 150)
-
-
-class GeneratorNet(torch.nn.Module):
-    """
-    A three hidden-layer generative neural network
-    """
-    def __init__(self):
-        super(GeneratorNet, self).__init__()
-        n_features = 150
-        n_out = 22500
-        
-        self.hidden0 = nn.Sequential(
-            nn.Linear(n_features, 256),
-            nn.LeakyReLU(0.2)
-        )
-        self.hidden1 = nn.Sequential(            
-            nn.Linear(256, 512),
-            nn.LeakyReLU(0.2)
-        )
-        self.hidden2 = nn.Sequential(
-            nn.Linear(512, 1024),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(0.1)
-        )
-        
-        self.out = nn.Sequential(
-            nn.Linear(1024, n_out),
-            nn.Tanh()
-        )
-
-    def forward(self, x):
-        x = self.hidden0(x)
-        print(str(x.size()) + "g0")
-        x = self.hidden1(x)
-        print(str(x.size()) + "g1")
-        x = self.hidden2(x)
-        print(str(x.size()) + "g2")
-        x = self.out(x)
-        print("gen ret")
-        return x
-
-
-# Noise
-def noise_tensor(size):
-    n = Variable(torch.randn(size, 150))
-    n.cpu()
-    print(str(n.size()) + " noise size")
-    if torch.cuda.is_available():
-        return n.cuda()
-    return n
-
-
-# Img path to tensor
-def image_tensor(path):
-    img = Image.open(path)
-    trans = transforms.ToTensor()
-    n = Variable(compose(trans(img)))
-    n.cpu()
-    if torch.cuda.is_available():
-        return n.cuda()
-    return n
-
-
-discriminator = DiscriminatorNet()
-generator = GeneratorNet()
-if torch.cuda.is_available():
-    discriminator.cuda()
-    generator.cuda()
-
-
-# ## Optimization
-
-# Optimizers
-d_optimizer = optim.Adam(discriminator.parameters(), lr=0.0002)
-g_optimizer = optim.Adam(generator.parameters(), lr=0.0002)
-
-# Loss function
-loss = nn.BCELoss()
-
-# Number of steps to apply to the discriminator
-d_steps = 1  # In Goodfellow et. al 2014 this variable is assigned to 1
-# Number of epochs
-num_epochs = 200
-
-
-# ## Training
-
-
-def real_data_target(size):
-    '''
-    Tensor containing ones, with shape = size
-    '''
-    print("real target")
-    data = Variable(torch.ones(size, 1).cuda())
-    data.cpu()
-    if torch.cuda.is_available(): return data.cuda()
-    return data
-
-
-def fake_data_target(size):
-    '''
-    Tensor containing zeros, with shape = size
-    '''
-    print("fake target")
-    data = Variable(torch.zeros(size, 1).cuda())
-    data.cpu()
-    if torch.cuda.is_available(): return data.cuda()
-    return data
-
-
-def train_discriminator(optimizer, real_data, fake_data):
-    # Reset gradients
-    optimizer.zero_grad()
-    print(str(real_data.size()) + " real_data")
-    #real_data = real_data.reshape([6,10000])
-    # 1.1 Train on Real Data
-    prediction_real = discriminator(real_data)
-    # Calculate error and backpropagate
-    error_real = loss(prediction_real, real_data_target(real_data.size(0)))
-    error_real.backward()
-
-    # 1.2 Train on Fake Data
-    prediction_fake = discriminator(fake_data)
-    # Calculate error and backpropagate
-    error_fake = loss(prediction_fake, fake_data_target(real_data.size(0)))
-    error_fake.backward()
-    
-    # 1.3 Update weights with gradients
-    optimizer.step()
-    
-    # Return error
-    return error_real + error_fake, prediction_real, prediction_fake
-
-
-def train_generator(optimizer, fake_data):
-    # 2. Train Generator
-    # Reset gradients
-    optimizer.zero_grad()
-    # Sample noise and generate fake data
-    prediction = discriminator(fake_data)
-    # Calculate error and backpropagate
-    error = loss(prediction, real_data_target(prediction.size(0)))
-    error.backward()
-    # Update weights with gradients
-    optimizer.step()
-    # Return error
-    return error
-
-
-# ### Generate Samples for Testing
-
-num_test_samples = 16
-test_noise = noise_tensor(num_test_samples)
-
-
-# ### Start training
-
-logger = Logger(model_name='Face GAN', data_name='Custom_3')
-
-for epoch in range(num_epochs):
-    for n_batch, (real_batch,_) in enumerate(data_loader):
-
-        # 1. Train Discriminator
-        print(str(real_batch.size()) + " batch")
-        real_data = Variable(images_to_vectors(real_batch))
-        #real_data=real_data.reshape(-1)
-        print(str(real_data.size()) +" data")
-
-        if torch.cuda.is_available(): real_data = real_data.cuda()
-        # Generate fake data
-        fake_data = generator(noise_tensor(real_data.size(0))).detach()
-        # Train D
-        d_error, d_pred_real, d_pred_fake = train_discriminator(d_optimizer,
-                                                                real_data, fake_data)
-
-        # 2. Train Generator
-        # Generate fake data
-        fake_data = generator(noise_tensor(real_batch.size(0)))
-        # Train G
-        g_error = train_generator(g_optimizer, fake_data)
-        # Log error
-        logger.log(d_error, g_error, epoch, n_batch, num_batches)
-
-        # Display Progress
-        if (n_batch) % 100 == 0:
-            display.clear_output(True)
-            # Display Images
-            test_images = vectors_to_images(generator(test_noise)).data.cpu()
-            logger.log_images(test_images, num_test_samples, epoch, n_batch, num_batches)
-            # Display status Logs
-            logger.display_status(
-                epoch, num_epochs, n_batch, num_batches,
-                d_error, g_error, d_pred_real, d_pred_fake
-            )
-        # Model Checkpoints
-        logger.save_models(generator, discriminator, epoch)
-
+# define the standalone discriminator model
+def define_discriminator(in_shape=(28,28,1), n_classes=10):
+	# label input
+	in_label = Input(shape=(1,))
+	# embedding for categorical input
+	li = Embedding(n_classes, 50)(in_label)
+	# scale up to image dimensions with linear activation
+	n_nodes = in_shape[0] * in_shape[1]
+	li = Dense(n_nodes)(li)
+	# reshape to additional channel
+	li = Reshape((in_shape[0], in_shape[1], 1))(li)
+	# image input
+	in_image = Input(shape=in_shape)
+	# concat label as a channel
+	merge = Concatenate()([in_image, li])
+	# downsample
+	fe = Conv2D(128, (3,3), strides=(2,2), padding='same')(merge)
+	fe = LeakyReLU(alpha=0.2)(fe)
+	# downsample
+	fe = Conv2D(128, (3,3), strides=(2,2), padding='same')(fe)
+	fe = LeakyReLU(alpha=0.2)(fe)
+	# flatten feature maps
+	fe = Flatten()(fe)
+	# dropout
+	fe = Dropout(0.4)(fe)
+	# output
+	out_layer = Dense(1, activation='sigmoid')(fe)
+	# define model
+	model = Model([in_image, in_label], out_layer)
+	# compile model
+	opt = Adam(lr=0.0002, beta_1=0.5)
+	model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+	return model
+ 
+# define the standalone generator model
+def define_generator(latent_dim, n_classes=10):
+	# label input
+	in_label = Input(shape=(1,))
+	# embedding for categorical input
+	li = Embedding(n_classes, 50)(in_label)
+	# linear multiplication
+	n_nodes = 7 * 7
+	li = Dense(n_nodes)(li)
+	# reshape to additional channel
+	li = Reshape((7, 7, 1))(li)
+	# image generator input
+	in_lat = Input(shape=(latent_dim,))
+	# foundation for 7x7 image
+	n_nodes = 128 * 7 * 7
+	gen = Dense(n_nodes)(in_lat)
+	gen = LeakyReLU(alpha=0.2)(gen)
+	gen = Reshape((7, 7, 128))(gen)
+	# merge image gen and label input
+	merge = Concatenate()([gen, li])
+	# upsample to 14x14
+	gen = Conv2DTranspose(128, (4,4), strides=(2,2), padding='same')(merge)
+	gen = LeakyReLU(alpha=0.2)(gen)
+	# upsample to 28x28
+	gen = Conv2DTranspose(128, (4,4), strides=(2,2), padding='same')(gen)
+	gen = LeakyReLU(alpha=0.2)(gen)
+	# output
+	out_layer = Conv2D(1, (7,7), activation='tanh', padding='same')(gen)
+	# define model
+	model = Model([in_lat, in_label], out_layer)
+	return model
+ 
+# define the combined generator and discriminator model, for updating the generator
+def define_gan(g_model, d_model):
+	# make weights in the discriminator not trainable
+	d_model.trainable = False
+	# get noise and label inputs from generator model
+	gen_noise, gen_label = g_model.input
+	# get image output from the generator model
+	gen_output = g_model.output
+	# connect image output and label input from generator as inputs to discriminator
+	gan_output = d_model([gen_output, gen_label])
+	# define gan model as taking noise and label and outputting a classification
+	model = Model([gen_noise, gen_label], gan_output)
+	# compile model
+	opt = Adam(lr=0.0002, beta_1=0.5)
+	model.compile(loss='binary_crossentropy', optimizer=opt)
+	return model
+ 
+# load fashion mnist images
+def load_real_samples():
+	# load dataset
+	(trainX, trainy), (_, _) = load_data()
+	# expand to 3d, e.g. add channels
+	X = expand_dims(trainX, axis=-1)
+	# convert from ints to floats
+	X = X.astype('float32')
+	# scale from [0,255] to [-1,1]
+	X = (X - 127.5) / 127.5
+	return [X, trainy]
+ 
+# # select real samples
+def generate_real_samples(dataset, n_samples):
+	# split into images and labels
+	images, labels = dataset
+	# choose random instances
+	ix = randint(0, images.shape[0], n_samples)
+	# select images and labels
+	X, labels = images[ix], labels[ix]
+	# generate class labels
+	y = ones((n_samples, 1))
+	return [X, labels], y
+ 
+# generate points in latent space as input for the generator
+def generate_latent_points(latent_dim, n_samples, n_classes=10):
+	# generate points in the latent space
+	x_input = randn(latent_dim * n_samples)
+	# reshape into a batch of inputs for the network
+	z_input = x_input.reshape(n_samples, latent_dim)
+	# generate labels
+	labels = randint(0, n_classes, n_samples)
+	return [z_input, labels]
+ 
+# use the generator to generate n fake examples, with class labels
+def generate_fake_samples(generator, latent_dim, n_samples):
+	# generate points in latent space
+	z_input, labels_input = generate_latent_points(latent_dim, n_samples)
+	# predict outputs
+	images = generator.predict([z_input, labels_input])
+	# create class labels
+	y = zeros((n_samples, 1))
+	return [images, labels_input], y
+ 
+# train the generator and discriminator
+def train(g_model, d_model, gan_model, dataset, latent_dim, n_epochs=50, n_batch=128):
+	bat_per_epo = int(dataset[0].shape[0] / n_batch)
+	half_batch = int(n_batch / 2)
+	# manually enumerate epochs
+	for i in range(n_epochs):
+		# enumerate batches over the training set
+		for j in range(bat_per_epo):
+			# get randomly selected 'real' samples
+			[X_real, labels_real], y_real = generate_real_samples(dataset, half_batch)
+			# update discriminator model weights
+			d_loss1, _ = d_model.train_on_batch([X_real, labels_real], y_real)
+			# generate 'fake' examples
+			[X_fake, labels], y_fake = generate_fake_samples(g_model, latent_dim, half_batch)
+			# update discriminator model weights
+			d_loss2, _ = d_model.train_on_batch([X_fake, labels], y_fake)
+			# prepare points in latent space as input for the generator
+			[z_input, labels_input] = generate_latent_points(latent_dim, n_batch)
+			# create inverted labels for the fake samples
+			y_gan = ones((n_batch, 1))
+			# update the generator via the discriminator's error
+			g_loss = gan_model.train_on_batch([z_input, labels_input], y_gan)
+			# summarize loss on this batch
+			print('>%d, %d/%d, d1=%.3f, d2=%.3f g=%.3f' %
+				(i+1, j+1, bat_per_epo, d_loss1, d_loss2, g_loss))
+	# save the generator model
+	g_model.save('cgan_generator.h5')
+ 
+# size of the latent space
+latent_dim = 100
+# create the discriminator
+d_model = define_discriminator()
+# create the generator
+g_model = define_generator(latent_dim)
+# create the gan
+gan_model = define_gan(g_model, d_model)
+# load image data
+dataset = load_real_samples()
+# train model
+train(g_model, d_model, gan_model, dataset, latent_dim)
