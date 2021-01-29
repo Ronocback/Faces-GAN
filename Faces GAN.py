@@ -24,9 +24,9 @@ compose = transforms.Compose(
         ])
 
 # Load data
-data = datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
+#data = datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
 # Create loader with data, so that we can iterate over it
-data_loader = torch.utils.data.DataLoader(data, batch_size=16, shuffle=True, pin_memory=True)
+#data_loader = torch.utils.data.DataLoader(data, batch_size=16, shuffle=True, pin_memory=True)
 # Num batches
 num_batches = len(data_loader)
 
